@@ -4,27 +4,42 @@ $message = "";
 // The base address of your API
 $apiUrl = "http://localhost:8000/api.php";
 
-// Default page load or "Print All" button (Sends 1 Parameter: action=get_all)
-if (isset($_GET["print_all"]) || empty($_GET)) {
-    $json = file_get_contents($apiUrl . "?action=get_all");
-    $data = json_decode($json, true);
+// Helper function to make API calls safely using cURL with a fallback
+function makeApiCall($url) {
+    if (function_exists('curl_init')) {
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 5);
+        $response = curl_exec($ch);
+        curl_close($ch);
+    } else {
+        // Fallback if cURL extension is not enabled in php.ini
+        $response = @file_get_contents($url);
+    }
+    
+    return json_decode($response, true);
+}
 
-    if ($data["status"] === "success") {
+// Default page load or "Print All" button (1 Parameter: action=get_all)
+if (isset($_GET["print_all"]) || empty($_GET)) {
+    $data = makeApiCall($apiUrl . "?action=get_all");
+
+    if (isset($data["status"]) && $data["status"] === "success") {
         $message = "Array contents: " . implode(", ", $data["data"]);
     }
 }
 
-// "Print at Index" form submission (Sends 2 Parameters: action=get_index & index=X)
+// "Print at Index" form submission (2 Parameters: action=get_index & index=X)
 if (isset($_GET["index"]) && $_GET["index"] !== "") {
     $input = $_GET["index"];
 
-    $json = file_get_contents($apiUrl . "?action=get_index&index=" . urlencode($input));
-    $data = json_decode($json, true);
+    $data = makeApiCall($apiUrl . "?action=get_index&index=" . urlencode($input));
 
-    if ($data["status"] === "success") {
+    if (isset($data["status"]) && $data["status"] === "success") {
         $message = $data["result"];
     } else {
-        $message = $data["message"];
+        $message = $data["message"] ?? "Error fetching data.";
     }
 }
 ?>
@@ -32,7 +47,7 @@ if (isset($_GET["index"]) && $_GET["index"] !== "") {
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Array Viewer (GET Version)</title>
+    <title>Array Viewer (cURL Version)</title>
     <style>
         body { font-family: Arial, sans-serif; background: #1e1e1e; color: #fff; text-align: center; padding-top: 50px; }
         .card { background: #2b2b2b; display: inline-block; padding: 20px 40px; border-radius: 8px; }
@@ -45,7 +60,7 @@ if (isset($_GET["index"]) && $_GET["index"] !== "") {
 <body>
 
 <div class="card">
-    <h1>Array Viewer (GET)</h1>
+    <h1>Array Viewer (cURL)</h1>
 
     <form method="GET">
         <button type="submit" name="print_all" value="true">Print All</button>
